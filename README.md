@@ -4,7 +4,7 @@ A collaborative codebase for EECS 6892 grading
 
 ## How to use
 1. Clone repository;
-2. decrompress ```datasets.zip``` into the same directory;
+2. download and decrompress ```datasets.zip``` into the same directory, available at our [Lion Drive]{https://drive.google.com/drive/u/1/folders/1wjTKzzzDZjisEQlYadnN0MHoMN3MAFOB};
 3. Modify `token` argument in the test run notebook and paths in all inference and training scripts;
 4. Install dependencies. You can achieve such by running the command below;
     ```
