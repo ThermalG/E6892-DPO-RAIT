@@ -1,7 +1,10 @@
 # E6892 Refusal Awareness Instruction Tuning for lightweight LLMs
 A collaborative codebase for EECS 6892 grading
+
 The current repository contains three parts: the inference folder, the training folder and the outputs folder.
+
 The inference folder has scripts for generating the model's answers to the datasets' questions;
+
 The training folder has scripts to clean the model's outputs for training format, both SFT and DPO training scripts, and the deepspeed training setting ds_config.json. 
 ## How to use
 1. Clone repository;
