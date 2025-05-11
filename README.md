@@ -11,4 +11,4 @@ A collaborative codebase for EECS 6892 grading
     pip install -r requirements.txt
     ```
 5. Run using the command for optimal speed and results
-   ```accelerate launch --num_processes 2 --multi_gpu path/to/the/script/you/want/to/run.py --batch-size 64 --repeats 10 [--compile]```
+   ```deepseed train.py ds_config.json```
