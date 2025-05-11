@@ -1,0 +1,8 @@
+datasets==3.5.0
+transformers==4.51.3
+trl==0.18.0.dev0
+torch==2.5.1+cu124
+numpy==1.26.3
+tqdm==4.67.1
+accelerate==1.6.0
+rapidfuzz==3.13.0
