@@ -25,9 +25,9 @@ def tokenize(example_batch):
     ]
     tokenized = llama_tokenizer(
         combined_inputs,
-        padding=True,          # Pad to longest in batch
-        truncation=True,       # Truncate to model's max length if needed
-        max_length=2048      # Truncate to 2048 tokens
+        padding=True,          
+        truncation=True,      
+        max_length=2048      
     )
     tokenized["labels"] = tokenized["input_ids"].copy()
     return tokenized
@@ -56,14 +56,13 @@ training_args = TrainingArguments(
     bf16=True,
     deepspeed="./ds_config.json",
     save_strategy="steps",
-    save_steps=300,  # ~30 minutes if ~3s/step
+    save_steps=300,  
     save_total_limit=3,
     logging_dir="./logs",
     logging_steps=10,
     report_to="none"
 )
 
-# Trainer
 trainer = Trainer(
     model=llama_model,
     args=training_args,
@@ -72,7 +71,6 @@ trainer = Trainer(
     data_collator=DataCollatorForLanguageModeling(llama_tokenizer, mlm=False)
 )
 
-# Train
 trainer.train(resume_from_checkpoint=resume_checkpoint if resume_checkpoint else None)
 
 llama_tokenizer.save_pretrained("/insomnia001/depts/edu/users/qc2354/outputs/llama3.2-3B-SFT-4data-final")
