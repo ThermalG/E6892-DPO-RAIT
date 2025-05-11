@@ -5,7 +5,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from accelerate import Accelerator
 from accelerate.utils import broadcast_object_list
 
-os.environ["TOKENIZERS_PARALLELISM"] = "false" # suppress verbose warning
+os.environ["TOKENIZERS_PARALLELISM"] = "false" 
 
 parser = argparse.ArgumentParser(description="InfMMLU_2.py: mc mode inference")
 parser.add_argument("--model-path", type=str, default="/insomnia001/depts/edu/users/qc2354/models/llama3.2-3B")
@@ -15,11 +15,10 @@ parser.add_argument("--batch-size", type=int, default=40)
 parser.add_argument("--max-len", type=int, default=1024)
 args = parser.parse_args()
 
-# accelerator
+
 acc = Accelerator(cpu=False, mixed_precision="no")
 device = acc.device
 
-# tokenizer & model
 tok = AutoTokenizer.from_pretrained(args.model_path, use_fast=True)
 if tok.pad_token_id is None:
     tok.pad_token = tok.eos_token
@@ -32,9 +31,9 @@ model = AutoModelForCausalLM.from_pretrained(
 ).eval()
 model.config.pad_token_id = tok.pad_token_id
 
-# MC choices & label maps
+
 choices = ["A", "B", "C"]
-label_to_letter = { # cover both singular/plural forms of the FEVER labels
+label_to_letter = { 
     "SUPPORTED":        "A",
     "SUPPORTS":         "A",
     "REFUTED":          "B",
@@ -43,7 +42,7 @@ label_to_letter = { # cover both singular/plural forms of the FEVER labels
 }
 letter_to_label = {v: k for k, v in label_to_letter.items()}
 
-# prompt constructor
+
 def gen_prompt(claim: str) -> str:
     return (
         f"Claim: {claim.strip()}\n"
@@ -53,7 +52,7 @@ def gen_prompt(claim: str) -> str:
         "Answer:"
     )
 
-# batch inference
+
 @torch.no_grad()
 def batch_inference(triples):
     prompts = [gen_prompt(claim) for claim, _ in triples]
@@ -71,7 +70,6 @@ def batch_inference(triples):
     for b, (claim, gold_label) in enumerate(triples):
         logits_b = logits[b, last_idx[b]]
 
-        # map A/B/C → token IDs safely
         letter_ids = {}
         for ch in choices:
             ids = tok(f" {ch}", add_special_tokens=False).input_ids
@@ -105,7 +103,7 @@ def batch_inference(triples):
         prob_pred = float(probs[idx_max])
 
 
-        norm_label = gold_label.strip().upper() # normalize and lookup label
+        norm_label = gold_label.strip().upper() 
         if "SUPPORT" in norm_label:
             ref_letter = "A"
         elif "REFUTE" in norm_label:
@@ -130,7 +128,7 @@ def batch_inference(triples):
 
     return results
 
-# load data
+
 if acc.is_main_process:
     records = json.load(open(args.data_path))
     data = [(r["claim"].strip(), r["label"].strip()) for r in records]
@@ -139,7 +137,7 @@ else:
 data = broadcast_object_list([data])[0]
 my_data = [data[i] for i in range(acc.process_index, len(data), acc.num_processes)]
 
-# inference
+
 all_results = []
 for i in tqdm(range(0, len(my_data), args.batch_size),
               desc=f"Rank {acc.process_index}",
@@ -148,7 +146,7 @@ for i in tqdm(range(0, len(my_data), args.batch_size),
     all_results.extend(batch_inference(batch))
     torch.cuda.empty_cache()
 
-# save & merge
+
 os.makedirs(args.save_dir, exist_ok=True)
 rank_path = os.path.join(args.save_dir, f"fever_rank{acc.process_index}.json")
 with open(rank_path, "w") as f:
