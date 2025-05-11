@@ -16,7 +16,7 @@ MODEL_PATH = "/insomnia001/depts/edu/users/qc2354/models/llama3.2-3B"
 DATA_PATH = "/insomnia001/home/qc2354/RLfiles/Outputs/Clean_DPO/total_DPO_ready.json"
 OUTPUT_DIR = "/insomnia001/depts/edu/users/qc2354/outputs/llama3.2-3B-DPO"
 
-# Load tokenizer and model
+
 tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, use_fast=False)
 tokenizer.pad_token = tokenizer.eos_token
 print("DEBUG — Tokenizer type:", type(tokenizer))
@@ -26,7 +26,7 @@ model.gradient_checkpointing_enable()
 ref_model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, torch_dtype=torch.bfloat16)
 ref_model.gradient_checkpointing_enable()
 
-# Load and format dataset
+
 ds = load_dataset("json", data_files=DATA_PATH, split="train")
 
 def prepare_dpo_format(example_batch):
@@ -38,7 +38,7 @@ def prepare_dpo_format(example_batch):
 
 ds = ds.map(prepare_dpo_format, batched=True)
 
-# Optional resume from checkpoint
+
 resume_checkpoint = None
 if os.path.exists(OUTPUT_DIR):
     checkpoints = [ckpt for ckpt in os.listdir(OUTPUT_DIR) if ckpt.startswith("checkpoint")]
@@ -46,7 +46,7 @@ if os.path.exists(OUTPUT_DIR):
         resume_checkpoint = os.path.join(OUTPUT_DIR, sorted(checkpoints)[-1])
         print(f"Resuming from checkpoint: {resume_checkpoint}")
 
-# DeepSpeed-compatible training args
+
 dpo_args = DPOConfig(
     output_dir=OUTPUT_DIR,
     per_device_train_batch_size=3,
@@ -77,9 +77,9 @@ trainer = DPOTrainer(
     processing_class = tokenizer
 )
 
-# Start training
+
 trainer.train(resume_from_checkpoint=resume_checkpoint)
 
-# Save model and tokenizer
+
 model.save_pretrained(f"{OUTPUT_DIR}/final")
 tokenizer.save_pretrained(f"{OUTPUT_DIR}/final")
