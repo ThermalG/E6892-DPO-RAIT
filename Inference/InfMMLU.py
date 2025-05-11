@@ -1,19 +1,14 @@
-"""InfMMLU_2_safe_logits.py — Revised MMLU inference with robust token ID handling"""
-
 import os
 import json
 import argparse
-
 import torch
 import numpy as np
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from accelerate import Accelerator
 from accelerate.utils import broadcast_object_list
-
 from RLfiles.Scripts.UsableScripts.InfPara6 import ask_sureness_batch
 
-# ────────── CLI ──────────
 parser = argparse.ArgumentParser(description="InfMMLU_2.py: mc mode inference")
 parser.add_argument("--mode", choices=["mc"], default="mc")
 parser.add_argument("--model-path", type=str, default="/insomnia001/depts/edu/users/qc2354/outputs/llama3.2-3B-DPO/final")
@@ -24,11 +19,11 @@ parser.add_argument("--batch-size", type=int, default=32)
 parser.add_argument("--max-len", type=int, default=1024)
 args = parser.parse_args()
 
-# ────────── Accelerator / Device ──────────
+# accelerator
 acc = Accelerator(cpu=False, mixed_precision="no")
 device = acc.device
 
-# ────────── Tokenizer & Model ──────────
+# tokenizer & model
 tok = AutoTokenizer.from_pretrained(args.model_path, use_fast=True)
 if tok.pad_token_id is None:
     tok.pad_token = tok.eos_token

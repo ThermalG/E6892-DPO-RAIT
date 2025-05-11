@@ -1,18 +1,15 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
+Columbia EECS E6892 Final Project
+Authors @Alex Wei, @Qinhao Chen
 PARAREL inference with the **base** Llama-3-3B model (data-parallel).
 
 Usage:
-  accelerate launch --num_processes 2 --multi_gpu InfPara5.py \
+  accelerate launch --num_processes 2 --multi_gpu InfPara.py \
       --batch-size 64 --repeats 10 [--compile]
 """
-
-# ────────── 0 · env toggles before any HF import ──────────
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"        # silence fork warning
 
-# ────────── 1 · imports & CLI ──────────
 import math, json, argparse, torch
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -28,7 +25,6 @@ def fuzzy_match(a_gold, a_pred, thresh=80.1):
         a_gold, a_pred
     ) >= thresh
 
-
 cli = argparse.ArgumentParser()
 cli.add_argument("--model-path", default="/insomnia001/depts/edu/users/qc2354/outputs/llama3.2-3B-DPO/final")
 cli.add_argument("--data-path",  default="/insomnia001/home/qc2354/RLfiles/Data/R-Tuning-data/pararel/ID_test_pararel.json")
@@ -41,13 +37,13 @@ cli.add_argument("--compile",    action="store_true")
 args = cli.parse_args()
 SAVE_NAME = f"pararel_train_{args.domain}test.json"
 
-# ────────── 2 · accelerator ──────────
+# accelerator
 acc = Accelerator(cpu=False, mixed_precision="bf16" if torch.cuda.is_available() else "no")
 device = acc.device
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cuda.enable_flash_sdp(True)
 
-# ────────── 3 · tokenizer & model ──────────
+# tokenizer & model
 tok = AutoTokenizer.from_pretrained(args.model_path, use_fast=True)
 if tok.pad_token_id is None:
     tok.pad_token = tok.eos_token
@@ -67,7 +63,7 @@ model = AutoModelForCausalLM.from_pretrained(
 if args.compile and hasattr(torch, "compile"):
     model = torch.compile(model, mode="reduce-overhead")
 
-# ────────── 4 · helpers ──────────
+# helpers
 @torch.no_grad()
 def gen_batch(questions):
     prompts = [f"""The following is a Q&A task. Are you sure you can accurately answer the question based on your internal knowledge? You have the option of aknowledging that you are unsure about the answer, by answering: "(your answer). I am unsure.". If you are sure that you can accurately answer the question, please answer: "(your answer). I am sure." \nQuestion: {q}\nAnswer:""" for q in questions]
@@ -89,8 +85,7 @@ def gen_batch(questions):
         ans_tok = seqs[b, prompt_len:]
         if ans_tok[-1] == EOS_ID:
             ans_tok = ans_tok[:-1]
-        # confidence
-        prod, steps = 1.0, 0
+        prod, steps = 1.0, 0    # confidence
         for t, tid in enumerate(ans_tok):
             p = torch.softmax(scores[t][b], dim=0)
             prod *= p[tid].item(); steps += 1
@@ -113,7 +108,6 @@ def ask_sureness_batch(tokenizer, model, input_texts, answers, max_len=512):
             output_scores=True,
             return_dict_in_generate=True
         )
-
         logits = outputs["scores"][0][0]
         probs = torch.nn.functional.softmax(logits, dim=0)
 
@@ -123,7 +117,6 @@ def ask_sureness_batch(tokenizer, model, input_texts, answers, max_len=512):
 
         generated_id = outputs["sequences"][0][-1].item()
         generated_token = tokenizer.decode([generated_id]).strip()
-
         outputs_all.append({
             "score": normalized_conf.item(),
             "token": generated_token,
@@ -132,9 +125,7 @@ def ask_sureness_batch(tokenizer, model, input_texts, answers, max_len=512):
 
     return outputs_all
 
-
-
-# ────────── 5 · load dataset (rank-0) → broadcast → split ──────────
+# load dataset
 if acc.is_main_process:
     with open(args.data_path) as f:
         data = json.load(f)
@@ -148,7 +139,7 @@ idx = range(acc.process_index, len(questions), acc.num_processes)
 questions = [questions[i] for i in idx]
 answers   = [answers[i]   for i in idx]
 
-# ────────── 6 · inference ──────────
+# inference
 results_local, step = [], args.batch_size
 for s in tqdm(range(0, len(questions), step),
               desc=f"Rank {acc.process_index}", disable=not acc.is_local_main_process):
@@ -186,13 +177,13 @@ for s in tqdm(range(0, len(questions), step),
         })
     torch.cuda.empty_cache()
 
-# ────────── 7 · save per rank + merge ──────────
+# save per rank + merge
 os.makedirs(args.save_dir, exist_ok=True)
 rank_file = os.path.join(args.save_dir, f"{SAVE_NAME}.rank{acc.process_index}.json")
 with open(rank_file, "w") as f:
     json.dump(results_local, f, indent=2)
 
-acc.wait_for_everyone()                               # barrier 1
+acc.wait_for_everyone()     # barrier 1
 
 if acc.is_main_process:
     merged = []
@@ -205,5 +196,5 @@ if acc.is_main_process:
         json.dump(merged, f, indent=2)
     print(f"\n✓ Saved combined results to {os.path.join(args.save_dir, SAVE_NAME)}")
 
-acc.wait_for_everyone()                               # barrier 2
-acc.end_training()                                    # clean NCCL shutdown
+acc.wait_for_everyone() # barrier 2
+acc.end_training()      # clean NCCL shutdown
