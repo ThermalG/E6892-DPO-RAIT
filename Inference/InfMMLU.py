@@ -19,11 +19,11 @@ parser.add_argument("--batch-size", type=int, default=32)
 parser.add_argument("--max-len", type=int, default=1024)
 args = parser.parse_args()
 
-# accelerator
+
 acc = Accelerator(cpu=False, mixed_precision="no")
 device = acc.device
 
-# tokenizer & model
+
 tok = AutoTokenizer.from_pretrained(args.model_path, use_fast=True)
 if tok.pad_token_id is None:
     tok.pad_token = tok.eos_token
@@ -38,7 +38,7 @@ model.config.pad_token_id = tok.pad_token_id
 
 choices = ["A", "B", "C", "D"]
 
-# prompt constructor
+
 def format_subject(subject):
     return " ".join(subject.split("_"))
 
@@ -91,9 +91,8 @@ def ask_sureness_batch_batched(tokenizer, model, input_texts, answers, max_len=5
         pad_token_id=tokenizer.pad_token_id
     )
 
-    logits_batch = outputs["scores"][0]  # (batch_size, vocab_size)
-    sequences = outputs["sequences"]     # (batch_size, seq_len)
-
+    logits_batch = outputs["scores"][0]  
+    sequences = outputs["sequences"]     
     results = []
     for i in range(len(prompts)):
         logits = logits_batch[i]
@@ -115,7 +114,7 @@ def ask_sureness_batch_batched(tokenizer, model, input_texts, answers, max_len=5
     return results
 
 
-# batch inference
+
 @torch.no_grad()
 def batch_inference(triples):
     prompts = [gen_prompt(s, inst, pd) for s, inst, pd in triples]
@@ -126,14 +125,14 @@ def batch_inference(triples):
                  max_length=args.max_len).to(device)
 
     outputs = model(**tok_in)
-    logits = outputs.logits  # (batch, seq_len, vocab)
+    logits = outputs.logits  
     last_tok_idx = (tok_in['attention_mask'].sum(dim=1) - 1).tolist()
 
     results = []
     for b, (subject, inst, pd) in enumerate(triples):
-        logits_b = logits[b, last_tok_idx[b]]  # (vocab_size,)
+        logits_b = logits[b, last_tok_idx[b]] 
 
-        letter_ids = {} # robust token ID mapping
+        letter_ids = {} 
         for ch in choices:
             ids = tok(f" {ch}", add_special_tokens=False).input_ids
             if len(ids) == 1:
@@ -183,7 +182,7 @@ def batch_inference(triples):
             "prob_reference_token": prob_ref
         })
         sureness_inputs = [gen_prompt(s, inst, pd) for s, inst, pd in triples]
-        pred_answers = [res["predicted"] for res in results[-len(triples):]]  # only the current batch's results
+        pred_answers = [res["predicted"] for res in results[-len(triples):]]  
         sureness_outputs = ask_sureness_batch(tok, model, sureness_inputs, pred_answers, max_len=args.max_len)
         for res, sure in zip(results[-len(triples):], sureness_outputs):
             res.update({
@@ -193,7 +192,7 @@ def batch_inference(triples):
             })
     return results
 
-# load data
+
 if acc.is_main_process:
     with open(args.data_path) as f: test_map = json.load(f)
     with open(args.prompt_path) as f: prompt_map = json.load(f)
@@ -218,7 +217,7 @@ my_triples = [
     for i in range(acc.process_index, len(all_triples), acc.num_processes)
 ]
 
-# inference
+
 results = []
 for i in tqdm(range(0, len(my_triples), args.batch_size),
               desc=f"Rank {acc.process_index}",
@@ -227,7 +226,7 @@ for i in tqdm(range(0, len(my_triples), args.batch_size),
     results.extend(batch_inference(batch))
     torch.cuda.empty_cache()
 
-# save
+
 os.makedirs(args.save_dir, exist_ok=True)
 rank_file = os.path.join(args.save_dir,
                          f"results.rank{acc.process_index}.json")
