@@ -6,3 +6,4 @@ numpy==1.26.3
 tqdm==4.67.1
 accelerate==1.6.0
 rapidfuzz==3.13.0
+deepspeed==0.16.7
